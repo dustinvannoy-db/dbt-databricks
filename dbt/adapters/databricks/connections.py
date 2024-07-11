@@ -797,8 +797,21 @@ class DatabricksConnectionManager(SparkConnectionManager):
         message = "OK"
         return DatabricksAdapterResponse(_message=message, query_id=query_id)  # type: ignore
 
-    def execute_dlt_model(self) -> None:
-        pass
+    def execute_dlt_model(self, name, upload_path, catalog, schema) -> None:
+        # TODO: Dustin add stuff
+        creds = cast(DatabricksCredentials, self.profile.credentials)
+        api_client = DatabricksApiClient.create(creds, 15 * 60)
+        try:
+            pipeline_id = api_client.dlt.get_pipeline(name)
+            api_client.dlt.update(pipeline_id, name, upload_path, catalog, schema)
+        except Exception as e:
+            logger.debug("Encountered error: " + str(e))
+            logger.info("DLT Pipeline does not exist, creating new pipeline.")
+            pipeline_id = api_client.dlt.create(name, upload_path, catalog, schema)
+        # TODO: Run pipeline
+
+
+
 
 
 class ExtendedSessionConnectionManager(DatabricksConnectionManager):

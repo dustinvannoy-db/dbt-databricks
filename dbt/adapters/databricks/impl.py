@@ -55,6 +55,7 @@ from dbt.adapters.databricks.relation import DatabricksRelationType
 from dbt.adapters.databricks.relation import KEY_TABLE_PROVIDER
 from dbt.adapters.databricks.relation_configs.base import DatabricksRelationConfig
 from dbt.adapters.databricks.relation_configs.base import DatabricksRelationConfigBase
+from dbt.adapters.databricks.relation_configs import base as relation_configs_base
 from dbt.adapters.databricks.relation_configs.incremental import IncrementalTableConfig
 from dbt.adapters.databricks.relation_configs.materialized_view import (
     MaterializedViewConfig,
@@ -685,7 +686,9 @@ class DatabricksAdapter(SparkAdapter):
     @available.parse(lambda *a, **k: {})
     def execute_dlt_model(self, relation: DatabricksRelation, model: RelationConfig) -> None:
         logger.debug(f"Executing DLT model {relation.identifier}")
-        self.connections.execute_dlt_model()
+        upload_path = relation_configs_base.get_config_value(model, "upload_path")
+        self.connections.execute_dlt_model(relation.identifier, upload_path, relation.database,
+                                           relation.schema)
 
 
 @dataclass(frozen=True)

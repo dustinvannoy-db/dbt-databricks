@@ -519,6 +519,7 @@ class DatabricksApiClient:
         self.workspace = WorkspaceApi(session, host, self.folders)
         self.commands = CommandApi(session, host, polling_interval, timeout)
         self.job_runs = JobRunsApi(session, host, polling_interval, timeout)
+        self.dlt = DltApi(session, host, polling_interval, timeout)
 
     @staticmethod
     def create(

@@ -34,6 +34,7 @@ models:
   - name: title_count
     config:
         materialized: dlt_notebook
+        upload_path: "Shared/dlt/test_pipeline"
 """
 
 expected_ref_csv = """title,count
