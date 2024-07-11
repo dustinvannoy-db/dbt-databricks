@@ -1,3 +1,6 @@
+from weakref import ref
+
+
 source_csv = """name,title
 "Elia","Ms"
 "Teo","Mr"
@@ -31,4 +34,24 @@ models:
   - name: title_count
     config:
         materialized: dlt_notebook
+"""
+
+expected_ref_csv = """title,count
+"Mr",1
+"""
+
+ref_schema = """
+version: 2
+
+models:
+  - name: title_count
+    config:
+        materialized: dlt_notebook
+  - name: dependent
+    config:
+        materialized: table
+"""
+
+dependent = """
+select * from {{ ref('title_count') }} where title = 'Mr'
 """
