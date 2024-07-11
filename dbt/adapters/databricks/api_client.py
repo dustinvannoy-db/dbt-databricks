@@ -41,6 +41,10 @@ class PrefixSession:
     ) -> Response:
         return self.session.post(f"{self.prefix}{suffix}", json=json, params=params)
 
+    def put(
+        self, suffix: str = "", json: Optional[Any] = None, params: Optional[Dict[str, Any]] = None
+    ) -> Response:
+        return self.session.put(f"{self.prefix}{suffix}", json=json, params=params)
 
 class DatabricksApi(ABC):
     def __init__(self, session: Session, host: str, api: str):
@@ -355,6 +359,146 @@ class JobRunsApi(PollableApi):
 
         if response.status_code != 200:
             raise DbtRuntimeError(f"Cancel run {run_id} failed.\n {response.content!r}")
+
+
+class DltApi(PollableApi):
+    def __init__(self, session: Session, host: str, polling_interval: int, timeout: int):
+        super().__init__(session, host, "/api/2.0/pipelines", polling_interval, timeout)
+
+    # def createv1(self, pipeline_spec: Dict[str, Any]) -> str:
+    #     submit_response = self.session.post(
+    #         "", json=pipeline_spec
+    #     )
+    #     if submit_response.status_code != 200:
+    #         raise DbtRuntimeError(f"Error creating DLT pipeline.\n {submit_response.content!r}")
+    #
+    #     logger.info(f"DLT pipeline creation response={submit_response.content!r}")
+    #     return submit_response.json()["pipeline_id"]
+
+    def create(self, name: str, notebook_path: str, catalog: str, schema: str, extra_libraries=[]) -> str:
+        pipeline_spec = {
+            "name": name,
+            "catalog": catalog,
+            "target": schema,
+            "libraries": [
+                {
+                    "notebook": {
+                        "path": notebook_path
+                    }
+                }
+            ],
+            "continuous": False,
+            "edition": "ADVANCED",
+            "configuration": {
+                "pipelines.tableManagedByMultiplePipelinesCheck.enabled": "true"
+            },
+            "serverless": True
+        }
+
+        submit_response = self.session.post(
+            "", json=pipeline_spec
+        )
+        if submit_response.status_code != 200:
+            raise DbtRuntimeError(f"Error creating DLT pipeline.\n {submit_response.content!r}")
+
+        logger.info(f"DLT pipeline creation response={submit_response.content!r}")
+        return submit_response.json()["pipeline_id"]
+    def get_pipeline(self, name: str) -> str:
+        # filter_str = f"""?filter=notebook='{path}'"""
+        filter_str = f"""?filter=name LIKE '{name}'"""
+        response = self.session.get(filter_str, json={})
+        logger.debug(f"Pipeline search response={response.content!r}")
+        if response.status_code != 200:
+            raise DbtRuntimeError(f"Error getting list of matching pipelines.\n {response.content!r}")
+
+        json_response = response.json()
+        found_pipeline=None
+        for i in json_response['statuses']:
+            if i['name'] == name:
+                found_pipeline = i
+                break
+        return found_pipeline
+    def update(self, pipeline_id: str, notebook_path: str, catalog: str, schema: str, extra_libraries=[]) -> str:
+        pipeline_spec = {
+            "catalog": catalog,
+            "target": schema,
+            "libraries": [
+                {
+                    "notebook": {
+                        "path": notebook_path
+                    }
+                }
+            ],
+            "continuous": False,
+            "edition": "ADVANCED",
+            "configuration": {
+                "pipelines.tableManagedByMultiplePipelinesCheck.enabled": "true"
+            },
+            "serverless": True
+        }
+
+        submit_response = self.session.put(
+            f"/{pipeline_id}", json=pipeline_spec
+        )
+        if submit_response.status_code != 200:
+            raise DbtRuntimeError(f"Error updating DLT pipeline.\n {submit_response.content!r}")
+
+        logger.info(f"DLT pipeline update response={submit_response.content!r}")
+        return submit_response.json()["pipeline_id"]
+
+    # def submit(self, run_name: str, job_spec: Dict[str, Any]) -> str:
+    #     submit_response = self.session.post(
+    #         "/submit", json={"run_name": run_name, "tasks": [job_spec]}
+    #     )
+    #     if submit_response.status_code != 200:
+    #         raise DbtRuntimeError(f"Error creating python run.\n {submit_response.content!r}")
+    #
+    #     logger.info(f"Job submission response={submit_response.content!r}")
+    #     return submit_response.json()["run_id"]
+
+    # def poll_for_completion(self, run_id: str) -> None:
+    #     self._poll_api(
+    #         url="/get",
+    #         params={"run_id": run_id},
+    #         get_state_func=lambda response: response.json()["state"]["life_cycle_state"],
+    #         terminal_states={"TERMINATED", "SKIPPED", "INTERNAL_ERROR"},
+    #         expected_end_state="TERMINATED",
+    #         unexpected_end_state_func=self._get_exception,
+    #     )
+
+    def _get_exception(self, response: Response) -> None:
+        response_json = response.json()
+        result_state = response_json["state"]["life_cycle_state"]
+        if result_state != "SUCCESS":
+            try:
+                task_id = response_json["tasks"][0]["run_id"]
+                # get end state to return to user
+                run_output = self.session.get("/get-output", params={"run_id": task_id})
+                json_run_output = run_output.json()
+                raise DbtRuntimeError(
+                    "Python model failed with traceback as:\n"
+                    "(Note that the line number here does not "
+                    "match the line number in your code due to dbt templating)\n"
+                    f"{json_run_output['error']}\n"
+                    f"{utils.remove_ansi(json_run_output.get('error_trace', ''))}"
+                )
+
+            except Exception as e:
+                if isinstance(e, DbtRuntimeError):
+                    raise e
+                else:
+                    state_message = response.json()["state"]["state_message"]
+                    raise DbtRuntimeError(
+                        f"Python model run ended in state {result_state} "
+                        f"with state_message\n{state_message}"
+                    )
+
+    # def cancel(self, run_id: str) -> None:
+    #     logger.debug(f"Cancelling run id {run_id}")
+    #     response = self.session.post("/cancel", json={"run_id": run_id})
+    #
+    #     if response.status_code != 200:
+    #         raise DbtRuntimeError(f"Cancel run {run_id} failed.\n {response.content!r}")
 
 
 class DatabricksApiClient:
