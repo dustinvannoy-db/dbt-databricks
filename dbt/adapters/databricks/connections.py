@@ -797,27 +797,24 @@ class DatabricksConnectionManager(SparkConnectionManager):
         message = "OK"
         return DatabricksAdapterResponse(_message=message, query_id=query_id)  # type: ignore
 
-    def execute_dlt_model(self, name, upload_path, catalog, schema, compiled_code) -> None:
+    def execute_dlt_model(self, name: str, catalog: str, schema: str, compiled_code: str) -> None:
         creds = cast(DatabricksCredentials, self.profile.credentials)
         api_client = DatabricksApiClient.create(creds, 15 * 60)
-        api_client.workspace.create_dlt_notebook_dir(upload_path)
+        upload_path = api_client.workspace.create_model_dir(catalog, schema)
         full_notebook_path = upload_path + "/" + name
-        api_client.workspace.upload_notebook(full_notebook_path, compiled_code)
+        api_client.workspace.upload_notebook(full_notebook_path, compiled_code, "SQL")
 
         try:
             pipeline_id = api_client.dlt.get_pipeline(name)
             # TODO: Retrieve more Pipeline response values that are required for update
-            api_client.dlt.update(pipeline_id, name, full_notebook_path, catalog, schema)
+            api_client.dlt.update(pipeline_id, full_notebook_path, catalog, schema)
         except KeyError:
             logger.info("DLT Pipeline does not exist, creating new pipeline.")
             pipeline_id = api_client.dlt.create(name, full_notebook_path, catalog, schema)
             logger.info("DLT pipeline created with ID: " + pipeline_id)
 
         run_response = api_client.dlt.run(pipeline_id)
-        api_client.dlt.poll_for_completion(pipeline_id, run_response['update_id'])
-
-
-
+        api_client.dlt.poll_for_completion(pipeline_id, run_response["update_id"])
 
 
 class ExtendedSessionConnectionManager(DatabricksConnectionManager):

@@ -46,6 +46,7 @@ class PrefixSession:
     ) -> Response:
         return self.session.put(f"{self.prefix}{suffix}", json=json, params=params)
 
+
 class DatabricksApi(ABC):
     def __init__(self, session: Session, host: str, api: str):
         self.session = PrefixSession(session, host, api)
@@ -170,37 +171,24 @@ class WorkspaceApi(DatabricksApi):
         super().__init__(session, host, "/api/2.0/workspace")
         self.user_api = folder_api
 
-    def create_python_model_dir(self, catalog: str, schema: str) -> str:
+    def create_model_dir(self, catalog: str, schema: str) -> str:
         folder = self.user_api.get_folder(catalog, schema)
 
         # Add
         response = self.session.post("/mkdirs", json={"path": folder})
         if response.status_code != 200:
-            raise DbtRuntimeError(
-                f"Error creating work_dir for python notebooks\n {response.content!r}"
-            )
+            raise DbtRuntimeError(f"Error creating work_dir for notebooks\n {response.content!r}")
 
         return folder
 
-
-    def create_dlt_notebook_dir(self, folder: str) -> str:
-        # Add
-        response = self.session.post("/mkdirs", json={"path": folder})
-        if response.status_code != 200:
-            raise DbtRuntimeError(
-                f"Error creating folder for dlt notebooks\n {response.content!r}"
-            )
-
-        return folder
-
-    def upload_notebook(self, path: str, compiled_code: str) -> None:
+    def upload_notebook(self, path: str, compiled_code: str, language: str = "PYTHON") -> None:
         b64_encoded_content = base64.b64encode(compiled_code.encode()).decode()
         response = self.session.post(
             "/import",
             json={
                 "path": path,
                 "content": b64_encoded_content,
-                "language": "PYTHON",
+                "language": language,
                 "overwrite": True,
                 "format": "SOURCE",
             },
@@ -386,39 +374,38 @@ class DltApi(PollableApi):
     #     logger.info(f"DLT pipeline creation response={submit_response.content!r}")
     #     return submit_response.json()["pipeline_id"]
 
-    def create(self, name: str, notebook_path: str, catalog: str, schema: str, extra_libraries=[]) -> str:
+    def create(
+        self,
+        name: str,
+        notebook_path: str,
+        catalog: str,
+        schema: str,
+    ) -> str:
         pipeline_spec = {
             "name": name,
             "catalog": catalog,
             "target": schema,
-            "libraries": [
-                {
-                    "notebook": {
-                        "path": notebook_path
-                    }
-                }
-            ],
+            "libraries": [{"notebook": {"path": notebook_path}}],
             "continuous": False,
             "edition": "ADVANCED",
-            "configuration": {
-                "pipelines.tableManagedByMultiplePipelinesCheck.enabled": "true"
-            },
-            "serverless": True
+            "configuration": {"pipelines.tableManagedByMultiplePipelinesCheck.enabled": "true"},
+            "clusters": [
+                {
+                    "label": "default",
+                    "autoscale": {"min_workers": 1, "max_workers": 1, "mode": "ENHANCED"},
+                }
+            ],
         }
 
-        submit_response = self.session.post(
-            "", json=pipeline_spec
-        )
+        submit_response = self.session.post("", json=pipeline_spec)
         if submit_response.status_code != 200:
             raise DbtRuntimeError(f"Error creating DLT pipeline.\n {submit_response.content!r}")
 
         logger.info(f"DLT pipeline creation response={submit_response.content!r}")
         return submit_response.json()["pipeline_id"]
 
-    def run(self, pipeline_id: str) -> str:
-        submit_response = self.session.post(
-            f"/{pipeline_id}/updates", json={}
-        )
+    def run(self, pipeline_id: str) -> Dict[str, Any]:
+        submit_response = self.session.post(f"/{pipeline_id}/updates", json={})
         if submit_response.status_code != 200:
             raise DbtRuntimeError(f"Error running DLT pipeline.\n {submit_response.content!r}")
 
@@ -431,43 +418,34 @@ class DltApi(PollableApi):
         response = self.session.get(filter_str, json={})
         logger.debug(f"Pipeline search response={response.content!r}")
         if response.status_code != 200:
-            raise DbtRuntimeError(f"Error getting list of matching pipelines.\n {response.content!r}")
+            raise DbtRuntimeError(
+                f"Error getting list of matching pipelines.\n {response.content!r}"
+            )
 
         json_response = response.json()
-        found_pipeline=None
-        for i in json_response['statuses']:
-            if i['name'] == name:
-                found_pipeline = i
-                break
-        return found_pipeline
-    def update(self, pipeline_id: str, notebook_path: str, catalog: str, schema: str, extra_libraries=[]) -> str:
+        for i in json_response["statuses"]:
+            if i["name"] == name:
+                return i["pipeline_id"]
+
+        raise DbtRuntimeError(f"Pipeline {name} not found")
+
+    def update(self, pipeline_id: str, notebook_path: str, catalog: str, schema: str) -> str:
         pipeline_spec = {
             "catalog": catalog,
             "target": schema,
-            "libraries": [
-                {
-                    "notebook": {
-                        "path": notebook_path
-                    }
-                }
-            ],
+            "libraries": [{"notebook": {"path": notebook_path}}],
             "continuous": False,
             "edition": "ADVANCED",
-            "configuration": {
-                "pipelines.tableManagedByMultiplePipelinesCheck.enabled": "true"
-            },
-            "serverless": True
+            "configuration": {"pipelines.tableManagedByMultiplePipelinesCheck.enabled": "true"},
+            "serverless": True,
         }
 
-        submit_response = self.session.put(
-            f"/{pipeline_id}", json=pipeline_spec
-        )
+        submit_response = self.session.put(f"/{pipeline_id}", json=pipeline_spec)
         if submit_response.status_code != 200:
             raise DbtRuntimeError(f"Error updating DLT pipeline.\n {submit_response.content!r}")
 
         logger.info(f"DLT pipeline update response={submit_response.content!r}")
         return submit_response.json()["pipeline_id"]
-
 
     def poll_for_completion(self, pipeline_id: str, update_id: str) -> None:
         self._poll_api(

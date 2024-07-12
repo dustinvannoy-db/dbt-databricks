@@ -53,7 +53,7 @@ from dbt.adapters.databricks.python_models.python_submissions import (
 from dbt.adapters.databricks.relation import DatabricksRelation
 from dbt.adapters.databricks.relation import DatabricksRelationType
 from dbt.adapters.databricks.relation import KEY_TABLE_PROVIDER
-from dbt.adapters.databricks.relation_configs.base import DatabricksRelationConfig
+from dbt.adapters.databricks.relation_configs.base import DatabricksRelationConfig, get_config_value
 from dbt.adapters.databricks.relation_configs.base import DatabricksRelationConfigBase
 from dbt.adapters.databricks.relation_configs import base as relation_configs_base
 from dbt.adapters.databricks.relation_configs.incremental import IncrementalTableConfig
@@ -684,11 +684,14 @@ class DatabricksAdapter(SparkAdapter):
             )
 
     @available.parse(lambda *a, **k: {})
-    def execute_dlt_model(self, relation: DatabricksRelation, model: RelationConfig, compiled_code: str) -> None:
+    def execute_dlt_model(self, relation: DatabricksRelation, compiled_code: str) -> None:
         logger.debug(f"Executing DLT model {relation.identifier}")
-        upload_path = model.model.config.extra['upload_path']
-        self.connections.execute_dlt_model(relation.identifier, upload_path, relation.database,
-                                           relation.schema, compiled_code)
+        self.connections.execute_dlt_model(
+            relation.identifier or "",
+            relation.database or "",
+            relation.schema or "",
+            compiled_code,
+        )
 
 
 @dataclass(frozen=True)

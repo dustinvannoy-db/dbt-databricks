@@ -18,7 +18,7 @@ expected_csv = """title,count
 
 dlt_notebook = """
 CREATE OR REFRESH MATERIALIZED VIEW title_count(
-    CONSTRAINT valid_title_count EXPECT count > 0
+    CONSTRAINT valid_titles EXPECT (title is not null AND title in ('Ms', 'Mr', 'Dr'))
 )
 AS (
     SELECT title, COUNT(*) as count
