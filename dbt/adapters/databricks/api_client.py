@@ -46,6 +46,11 @@ class PrefixSession:
     ) -> Response:
         return self.session.put(f"{self.prefix}{suffix}", json=json, params=params)
 
+    def delete(
+        self, suffix: str = "", json: Optional[Any] = None, params: Optional[Dict[str, Any]] = None
+    ) -> Response:
+        return self.session.delete(f"{self.prefix}{suffix}", json=json, params=params)
+
 
 class DatabricksApi(ABC):
     def __init__(self, session: Session, host: str, api: str):
@@ -446,6 +451,11 @@ class DltApi(PollableApi):
 
         logger.info(f"DLT pipeline update response={submit_response.content!r}")
         return submit_response.json()["pipeline_id"]
+
+    def delete(self, pipeline_id: str) -> None:
+        submit_response = self.session.delete(f"/{pipeline_id}")
+        if submit_response.status_code != 200:
+            raise DbtRuntimeError(f"Error deleting DLT pipeline.\n {submit_response.content!r}")
 
     def poll_for_completion(self, pipeline_id: str, update_id: str) -> None:
         self._poll_api(

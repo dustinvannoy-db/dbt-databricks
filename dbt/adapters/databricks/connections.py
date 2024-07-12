@@ -810,11 +810,18 @@ class DatabricksConnectionManager(SparkConnectionManager):
             api_client.dlt.update(pipeline_id, full_notebook_path, catalog, schema)
         except KeyError:
             logger.info("DLT Pipeline does not exist, creating new pipeline.")
-            pipeline_id = api_client.dlt.create(name, full_notebook_path, catalog, schema)
+            pipeline_id = api_client.dlt.create(
+                f"{catalog}-{schema}-{name}", full_notebook_path, catalog, schema
+            )
             logger.info("DLT pipeline created with ID: " + pipeline_id)
 
         run_response = api_client.dlt.run(pipeline_id)
         api_client.dlt.poll_for_completion(pipeline_id, run_response["update_id"])
+
+    def delete_dlt_pipeline(self, pipeline: str) -> None:
+        creds = cast(DatabricksCredentials, self.profile.credentials)
+        api_client = DatabricksApiClient.create(creds, 15 * 60)
+        api_client.dlt.delete(pipeline)
 
 
 class ExtendedSessionConnectionManager(DatabricksConnectionManager):
