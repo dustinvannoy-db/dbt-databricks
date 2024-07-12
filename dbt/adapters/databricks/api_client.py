@@ -473,9 +473,9 @@ class DltApi(PollableApi):
         self._poll_api(
             url=f"/{pipeline_id}/updates/{update_id}",
             params={},
-            get_state_func=lambda response: response.json()["state"]["life_cycle_state"],
-            terminal_states={"TERMINATED", "SKIPPED", "INTERNAL_ERROR"},
-            expected_end_state="TERMINATED",
+            get_state_func=lambda response: response.json()["update"]["state"],
+            terminal_states={"COMPLETED", "FAILED", "CANCELED"},
+            expected_end_state="COMPLETED",
             unexpected_end_state_func=self._get_exception,
         )
 
