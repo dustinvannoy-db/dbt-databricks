@@ -797,15 +797,17 @@ class DatabricksConnectionManager(SparkConnectionManager):
         message = "OK"
         return DatabricksAdapterResponse(_message=message, query_id=query_id)  # type: ignore
 
-    def execute_dlt_model(self, name: str, catalog: str, schema: str, compiled_code: str) -> None:
+    def execute_dlt_model(
+        self, name: str, catalog: str, schema: str, compiled_code: str, exists: bool
+    ) -> None:
         creds = cast(DatabricksCredentials, self.profile.credentials)
         api_client = DatabricksApiClient.create(creds, 15 * 60)
         upload_path = api_client.workspace.create_model_dir(catalog, schema)
-        full_notebook_path = upload_path + "/" + name
+        full_notebook_path = upload_path + name
         full_name = f"{catalog}-{schema}-{name}"
         api_client.workspace.upload_notebook(full_notebook_path, compiled_code, "SQL")
 
-        try:
+        if exists:
             _, results = self.execute(
                 f"SHOW TBLPROPERTIES `{catalog}`.`{schema}`.`{name}`", fetch=True
             )
@@ -816,8 +818,7 @@ class DatabricksConnectionManager(SparkConnectionManager):
                 pipeline_id = api_client.dlt.get_pipeline(name)
             # TODO: Retrieve more Pipeline response values that are required for update
             api_client.dlt.update(pipeline_id, full_name, full_notebook_path, catalog, schema)
-        except Exception as e:
-            logger.error(e)
+        else:
             logger.info("DLT Pipeline does not exist, creating new pipeline.")
             pipeline_id = api_client.dlt.create(full_name, full_notebook_path, catalog, schema)
             logger.info("DLT pipeline created with ID: " + pipeline_id)
