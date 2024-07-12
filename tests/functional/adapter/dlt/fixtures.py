@@ -68,7 +68,7 @@ CREATE OR REFRESH MATERIALIZED VIEW title_count(
 AS (
     SELECT title, COUNT(*) as count
     FROM {{ ref('source') }}
-    GROUP BY title
     WHERE title != 'Dr'
+    GROUP BY title
 )
 """

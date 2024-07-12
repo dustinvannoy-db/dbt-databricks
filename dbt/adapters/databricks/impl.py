@@ -55,7 +55,6 @@ from dbt.adapters.databricks.relation import DatabricksRelationType
 from dbt.adapters.databricks.relation import KEY_TABLE_PROVIDER
 from dbt.adapters.databricks.relation_configs.base import DatabricksRelationConfig, get_config_value
 from dbt.adapters.databricks.relation_configs.base import DatabricksRelationConfigBase
-from dbt.adapters.databricks.relation_configs import base as relation_configs_base
 from dbt.adapters.databricks.relation_configs.incremental import IncrementalTableConfig
 from dbt.adapters.databricks.relation_configs.materialized_view import (
     MaterializedViewConfig,

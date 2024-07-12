@@ -369,16 +369,6 @@ class DltApi(PollableApi):
     def __init__(self, session: Session, host: str, polling_interval: int, timeout: int):
         super().__init__(session, host, "/api/2.0/pipelines", polling_interval, timeout)
 
-    # def createv1(self, pipeline_spec: Dict[str, Any]) -> str:
-    #     submit_response = self.session.post(
-    #         "", json=pipeline_spec
-    #     )
-    #     if submit_response.status_code != 200:
-    #         raise DbtRuntimeError(f"Error creating DLT pipeline.\n {submit_response.content!r}")
-    #
-    #     logger.info(f"DLT pipeline creation response={submit_response.content!r}")
-    #     return submit_response.json()["pipeline_id"]
-
     def create(
         self,
         name: str,
@@ -418,7 +408,6 @@ class DltApi(PollableApi):
         return submit_response.json()
 
     def get_pipeline(self, name: str) -> str:
-        # filter_str = f"""?filter=notebook='{path}'"""
         filter_str = f"""?filter=name LIKE '{name}'"""
         response = self.session.get(filter_str, json={})
         logger.debug(f"Pipeline search response={response.content!r}")
@@ -477,13 +466,6 @@ class DltApi(PollableApi):
     def _get_exception(self, response: Response) -> None:
         response_json = response.json()
         return response_json["update"]["state"]
-
-    # def cancel(self, run_id: str) -> None:
-    #     logger.debug(f"Cancelling run id {run_id}")
-    #     response = self.session.post("/cancel", json={"run_id": run_id})
-    #
-    #     if response.status_code != 200:
-    #         raise DbtRuntimeError(f"Cancel run {run_id} failed.\n {response.content!r}")
 
 
 class DatabricksApiClient:
