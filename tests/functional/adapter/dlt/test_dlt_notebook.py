@@ -50,3 +50,23 @@ class TestReferencingDltNotebook(BaseTestDltNotebook):
         util.run_dbt(["run"])
 
         util.check_relations_equal(project.adapter, ["expected", "dependent"])
+
+
+class TestUpdatingDltNotebook(BaseTestDltNotebook):
+    @pytest.fixture(scope="class")
+    def seeds(self):
+        return {"source.csv": fixtures.source_csv, "expected.csv": fixtures.expected_updated_csv}
+
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {"schema.yml": fixtures.base_schema, "title_count.sql": fixtures.dlt_notebook}
+
+    def test_dlt_notebook_update(self, project):
+        util.run_dbt(["seed"])
+        util.run_dbt(["run"])
+
+        util.write_file(fixtures.updated_dlt_notebook, "models", "title_count.sql")
+
+        util.run_dbt(["run"])
+
+        util.check_relations_equal(project.adapter, ["expected", "title_count"])

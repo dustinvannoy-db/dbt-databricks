@@ -34,7 +34,6 @@ models:
   - name: title_count
     config:
         materialized: dlt_notebook
-        upload_path: "/Shared/dlt/test_pipeline"
 """
 
 expected_ref_csv = """title,count
@@ -55,4 +54,21 @@ models:
 
 dependent = """
 select * from {{ ref('title_count') }} where title = 'Mr'
+"""
+
+expected_updated_csv = """title,count
+"Ms",3
+"Mr",1
+"""
+
+updated_dlt_notebook = """
+CREATE OR REFRESH MATERIALIZED VIEW title_count(
+    CONSTRAINT valid_titles EXPECT (title is not null AND title in ('Ms', 'Mr', 'Dr'))
+)
+AS (
+    SELECT title, COUNT(*) as count
+    FROM {{ ref('source') }}
+    GROUP BY title
+    WHERE title != 'Dr'
+)
 """

@@ -434,15 +434,23 @@ class DltApi(PollableApi):
 
         raise DbtRuntimeError(f"Pipeline {name} not found")
 
-    def update(self, pipeline_id: str, notebook_path: str, catalog: str, schema: str) -> str:
+    def update(
+        self, pipeline_id: str, name: str, notebook_path: str, catalog: str, schema: str
+    ) -> None:
         pipeline_spec = {
+            "name": name,
             "catalog": catalog,
             "target": schema,
             "libraries": [{"notebook": {"path": notebook_path}}],
             "continuous": False,
             "edition": "ADVANCED",
             "configuration": {"pipelines.tableManagedByMultiplePipelinesCheck.enabled": "true"},
-            "serverless": True,
+            "clusters": [
+                {
+                    "label": "default",
+                    "autoscale": {"min_workers": 1, "max_workers": 1, "mode": "ENHANCED"},
+                }
+            ],
         }
 
         submit_response = self.session.put(f"/{pipeline_id}", json=pipeline_spec)
@@ -450,7 +458,6 @@ class DltApi(PollableApi):
             raise DbtRuntimeError(f"Error updating DLT pipeline.\n {submit_response.content!r}")
 
         logger.info(f"DLT pipeline update response={submit_response.content!r}")
-        return submit_response.json()["pipeline_id"]
 
     def delete(self, pipeline_id: str) -> None:
         submit_response = self.session.delete(f"/{pipeline_id}")
@@ -469,30 +476,7 @@ class DltApi(PollableApi):
 
     def _get_exception(self, response: Response) -> None:
         response_json = response.json()
-        result_state = response_json["state"]["life_cycle_state"]
-        if result_state != "SUCCESS":
-            try:
-                task_id = response_json["tasks"][0]["run_id"]
-                # get end state to return to user
-                run_output = self.session.get("/get-output", params={"run_id": task_id})
-                json_run_output = run_output.json()
-                raise DbtRuntimeError(
-                    "Python model failed with traceback as:\n"
-                    "(Note that the line number here does not "
-                    "match the line number in your code due to dbt templating)\n"
-                    f"{json_run_output['error']}\n"
-                    f"{utils.remove_ansi(json_run_output.get('error_trace', ''))}"
-                )
-
-            except Exception as e:
-                if isinstance(e, DbtRuntimeError):
-                    raise e
-                else:
-                    state_message = response.json()["state"]["state_message"]
-                    raise DbtRuntimeError(
-                        f"Python model run ended in state {result_state} "
-                        f"with state_message\n{state_message}"
-                    )
+        return response_json["update"]["state"]
 
     # def cancel(self, run_id: str) -> None:
     #     logger.debug(f"Cancelling run id {run_id}")
