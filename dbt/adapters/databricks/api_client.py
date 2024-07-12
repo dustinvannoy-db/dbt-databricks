@@ -182,6 +182,17 @@ class WorkspaceApi(DatabricksApi):
 
         return folder
 
+
+    def create_dlt_notebook_dir(self, folder: str) -> str:
+        # Add
+        response = self.session.post("/mkdirs", json={"path": folder})
+        if response.status_code != 200:
+            raise DbtRuntimeError(
+                f"Error creating folder for dlt notebooks\n {response.content!r}"
+            )
+
+        return folder
+
     def upload_notebook(self, path: str, compiled_code: str) -> None:
         b64_encoded_content = base64.b64encode(compiled_code.encode()).decode()
         response = self.session.post(
@@ -403,6 +414,17 @@ class DltApi(PollableApi):
 
         logger.info(f"DLT pipeline creation response={submit_response.content!r}")
         return submit_response.json()["pipeline_id"]
+
+    def run(self, pipeline_id: str) -> str:
+        submit_response = self.session.post(
+            f"/{pipeline_id}/updates", json={}
+        )
+        if submit_response.status_code != 200:
+            raise DbtRuntimeError(f"Error running DLT pipeline.\n {submit_response.content!r}")
+
+        logger.info(f"DLT pipeline run response={submit_response.content!r}")
+        return submit_response.json()
+
     def get_pipeline(self, name: str) -> str:
         # filter_str = f"""?filter=notebook='{path}'"""
         filter_str = f"""?filter=name LIKE '{name}'"""
@@ -446,25 +468,16 @@ class DltApi(PollableApi):
         logger.info(f"DLT pipeline update response={submit_response.content!r}")
         return submit_response.json()["pipeline_id"]
 
-    # def submit(self, run_name: str, job_spec: Dict[str, Any]) -> str:
-    #     submit_response = self.session.post(
-    #         "/submit", json={"run_name": run_name, "tasks": [job_spec]}
-    #     )
-    #     if submit_response.status_code != 200:
-    #         raise DbtRuntimeError(f"Error creating python run.\n {submit_response.content!r}")
-    #
-    #     logger.info(f"Job submission response={submit_response.content!r}")
-    #     return submit_response.json()["run_id"]
 
-    # def poll_for_completion(self, run_id: str) -> None:
-    #     self._poll_api(
-    #         url="/get",
-    #         params={"run_id": run_id},
-    #         get_state_func=lambda response: response.json()["state"]["life_cycle_state"],
-    #         terminal_states={"TERMINATED", "SKIPPED", "INTERNAL_ERROR"},
-    #         expected_end_state="TERMINATED",
-    #         unexpected_end_state_func=self._get_exception,
-    #     )
+    def poll_for_completion(self, pipeline_id: str, update_id: str) -> None:
+        self._poll_api(
+            url=f"/{pipeline_id}/updates/{update_id}",
+            params={},
+            get_state_func=lambda response: response.json()["state"]["life_cycle_state"],
+            terminal_states={"TERMINATED", "SKIPPED", "INTERNAL_ERROR"},
+            expected_end_state="TERMINATED",
+            unexpected_end_state_func=self._get_exception,
+        )
 
     def _get_exception(self, response: Response) -> None:
         response_json = response.json()

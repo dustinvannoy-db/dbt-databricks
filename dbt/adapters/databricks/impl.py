@@ -684,11 +684,11 @@ class DatabricksAdapter(SparkAdapter):
             )
 
     @available.parse(lambda *a, **k: {})
-    def execute_dlt_model(self, relation: DatabricksRelation, model: RelationConfig) -> None:
+    def execute_dlt_model(self, relation: DatabricksRelation, model: RelationConfig, compiled_code: str) -> None:
         logger.debug(f"Executing DLT model {relation.identifier}")
-        upload_path = relation_configs_base.get_config_value(model, "upload_path")
+        upload_path = model.model.config.extra['upload_path']
         self.connections.execute_dlt_model(relation.identifier, upload_path, relation.database,
-                                           relation.schema)
+                                           relation.schema, compiled_code)
 
 
 @dataclass(frozen=True)
