@@ -684,13 +684,16 @@ class DatabricksAdapter(SparkAdapter):
 
     @available.parse(lambda *a, **k: {})
     def execute_dlt_model(
-        self, relation: DatabricksRelation, compiled_code: str, exists: bool
+        self, relation: DatabricksRelation, config: Dict[str, Any], compiled_code: str, exists: bool
     ) -> None:
         logger.debug(f"Executing DLT model {relation.identifier}")
         self.connections.execute_dlt_model(
             relation.identifier or "",
             relation.database or "",
             relation.schema or "",
+            config.get("development", False),
+            config.get("serverless", False),
+            config.get("clusters", None),
             compiled_code,
             exists,
         )

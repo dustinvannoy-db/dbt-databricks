@@ -375,23 +375,23 @@ class DltApi(PollableApi):
         notebook_path: str,
         catalog: str,
         schema: str,
+        development: bool,
+        serverless: bool,
+        clusters: Dict[str, Any]
     ) -> str:
         pipeline_spec = {
             "name": name,
             "catalog": catalog,
             "target": schema,
             "libraries": [{"notebook": {"path": notebook_path}}],
-            "development": True,
+            "development": development,
             "continuous": False,
             "edition": "ADVANCED",
-            "configuration": {"pipelines.tableManagedByMultiplePipelinesCheck.enabled": "true"},
-            "clusters": [
-                {
-                    "label": "default",
-                    "autoscale": {"min_workers": 1, "max_workers": 1, "mode": "ENHANCED"},
-                }
-            ],
+            "serverless": serverless,
+            "configuration": {"pipelines.tableManagedByMultiplePipelinesCheck.enabled": "true"}\
         }
+        if not serverless:
+            pipeline_spec['clusters'] = clusters
 
         submit_response = self.session.post("", json=pipeline_spec)
         if submit_response.status_code != 200:
@@ -425,24 +425,22 @@ class DltApi(PollableApi):
         raise DbtRuntimeError(f"Pipeline {name} not found")
 
     def update(
-        self, pipeline_id: str, name: str, notebook_path: str, catalog: str, schema: str
+            self, pipeline_id: str, name: str, notebook_path: str, catalog: str, schema: str, development: bool,
+            serverless: bool, clusters: Dict[str, Any]
     ) -> None:
         pipeline_spec = {
             "name": name,
             "catalog": catalog,
             "target": schema,
             "libraries": [{"notebook": {"path": notebook_path}}],
-            "development": True,
+            "development": development,
             "continuous": False,
             "edition": "ADVANCED",
             "configuration": {"pipelines.tableManagedByMultiplePipelinesCheck.enabled": "true"},
-            "clusters": [
-                {
-                    "label": "default",
-                    "autoscale": {"min_workers": 1, "max_workers": 1, "mode": "ENHANCED"},
-                }
-            ],
+            "serverless": serverless
         }
+        if not serverless:
+            pipeline_spec['clusters'] = clusters
 
         submit_response = self.session.put(f"/{pipeline_id}", json=pipeline_spec)
         if submit_response.status_code != 200:

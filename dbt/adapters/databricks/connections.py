@@ -798,7 +798,7 @@ class DatabricksConnectionManager(SparkConnectionManager):
         return DatabricksAdapterResponse(_message=message, query_id=query_id)  # type: ignore
 
     def execute_dlt_model(
-        self, name: str, catalog: str, schema: str, compiled_code: str, exists: bool
+        self, name: str, catalog: str, schema: str, development: bool, serverless: bool, clusters: Dict[str, Any], compiled_code: str, exists: bool
     ) -> None:
         creds = cast(DatabricksCredentials, self.profile.credentials)
         api_client = DatabricksApiClient.create(creds, 15 * 60)
@@ -817,10 +817,12 @@ class DatabricksConnectionManager(SparkConnectionManager):
             if not pipeline_id:
                 pipeline_id = api_client.dlt.get_pipeline(name)
             # TODO: Retrieve more Pipeline response values that are required for update
-            api_client.dlt.update(pipeline_id, full_name, full_notebook_path, catalog, schema)
+            api_client.dlt.update(pipeline_id, full_name, full_notebook_path, catalog, schema, development, serverless,
+                                  clusters)
         else:
             logger.info("DLT Pipeline does not exist, creating new pipeline.")
-            pipeline_id = api_client.dlt.create(full_name, full_notebook_path, catalog, schema)
+            pipeline_id = api_client.dlt.create(full_name, full_notebook_path, catalog, schema, development, serverless,
+                                                clusters)
             logger.info("DLT pipeline created with ID: " + pipeline_id)
 
         run_response = api_client.dlt.run(pipeline_id)

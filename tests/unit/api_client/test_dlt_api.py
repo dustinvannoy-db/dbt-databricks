@@ -16,10 +16,11 @@ class TestDltApi(ApiTestBase):
 
         session.post.return_value.status_code = 200
         session.post.return_value.json.return_value = {"pipeline_id": "pipeline_id"}
-        assert api.create(my_name, my_notebook_path, my_catalog, my_schema) == "pipeline_id"
+        clusters = [{"label": "default","autoscale": {"min_workers": 1, "max_workers": 1, "mode": "ENHANCED"}}]
+        assert api.create(my_name, my_notebook_path, my_catalog, my_schema, True, False, clusters) == "pipeline_id"
         session.post.assert_called_once_with(
             f"https://{host}/api/2.0/pipelines",
-            json={'name': 'my_dlt_pipeline', 'catalog': 'main', 'target': 'dustin_vannoy', 'libraries': [{'notebook': {'path': '/Repos/user@databricks.com/example-repo/DLT_job'}}], 'development': ANY, 'continuous': ANY, 'edition': ANY, 'configuration': ANY, 'clusters': ANY},
+            json={'name': 'my_dlt_pipeline', 'catalog': 'main', 'target': 'dustin_vannoy', 'libraries': [{'notebook': {'path': '/Repos/user@databricks.com/example-repo/DLT_job'}}], 'development': ANY, 'continuous': ANY, 'edition': ANY, 'configuration': ANY, 'serverless': ANY, 'clusters': ANY},
             params=None,
         )
 
@@ -44,12 +45,12 @@ class TestDltApi(ApiTestBase):
         session.put.return_value.status_code = 200
         session.put.return_value.json.return_value = {"pipeline_id": "pipeline_id"}
 
-        assert api.update("pipeline_id", my_name, my_notebook_path, my_catalog, my_schema) is None
+        assert api.update("pipeline_id", my_name, my_notebook_path, my_catalog, my_schema, True, True, {}) is None
         session.put.assert_called_once_with(
             f"https://{host}/api/2.0/pipelines/pipeline_id",
             json={'name': 'my_dlt_pipeline', 'catalog': 'main', 'target': 'dustin_vannoy',
                   'libraries': [{'notebook': {'path': '/Repos/user@databricks.com/example-repo/DLT_job'}}],
-                  'development': ANY, 'continuous': ANY, 'edition': ANY, 'configuration': ANY, 'clusters': ANY},
+                  'development': ANY, 'continuous': ANY, 'edition': ANY, 'configuration': ANY, 'serverless': True},
             params=None,
         )
 

@@ -34,6 +34,9 @@ models:
   - name: title_count
     config:
         materialized: dlt_notebook
+        development: True
+        serverless: False
+        clusters: [{"label": "default","autoscale": {"min_workers": 1, "max_workers": 1, "mode": "ENHANCED"}}]
 """
 
 expected_ref_csv = """title,count
@@ -47,6 +50,9 @@ models:
   - name: title_count
     config:
         materialized: dlt_notebook
+        development: True
+        serverless: False
+        clusters: [{"label": "default","autoscale": {"min_workers": 1, "max_workers": 1, "mode": "ENHANCED"}}]
   - name: dependent
     config:
         materialized: table
